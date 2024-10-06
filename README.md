@@ -139,4 +139,70 @@ If Python were to have a None-aware attribute getter as we propose, the same res
 employee: Employee = ...
 amount = employee?.payroll?.salary?.base
 ```
+## Alternatives considered
+
+### `try: ... except AttributeError: return None`
+
+One of the current options is to use the following:
+
+```python
+try:
+    return employee.payroll.salary.base
+except AttributeError:
+    return None
+```
+
+However this approach has its flaws.
+
+Suppose there used to be a 'bonus' field on the 'salary' object, but that has now changed. The `try: ... catch AttributeError: return None` methodology would now return `None` when it should, really, raise an AttributeError.
+
+This example illustrates that there are two distinct semantics:
+- I want a None returned when trying to access an attribute of a value (of type `T | None`) when that value is None.
+- I want an AttributeError raised if I try to access a field on a non-None value and that attribute does not exist.
+
+The `try: ... catch AttributeError: return None` does not allow to have these two distinct meanings.
+
+On another note, this construct induces boilerplate code when this chaining happens in function arguments.
+
+For instance:
+
+```python
+@dataclass
+class CostUnit:
+    frequency: str
+    amount: int
+    currency: str
+
+
+# proposed
+cost_unit = CostUnit(
+    frequency=employee?.payroll?.salary?.frequency or "monthly",
+    amount=employee?.payroll?.salary?.base?.amount or 0,
+    currency=employee?.payroll?.salary?.currency or "USD",
+)
+
+# current
+frequency: str
+amount: int
+currency: str
+try:
+    frequency = employee.payroll.salary.frequency
+except AttributeError:
+    frequency = "monthly"
+try:
+    amount = employee.payroll.salary.base.amount
+except AttributeError:
+    amount = 0
+try:
+    currency = employee.payroll.salary.currency
+except AttributeError:
+    currency = "USD"
+cost_unit = CostUnit(
+    frequency=frequency,
+    amount=amount,
+    currency=currency,
+)
+```
+
+We would argue that, in addition to removing boilerplate code, the proposed form conveys the intention better because it is more local.
 
